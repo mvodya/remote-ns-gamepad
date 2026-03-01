@@ -12,7 +12,7 @@
  * Contact: mvodya@icloud.com
  */
 
-#include "hid.hpp"
+#include "nshid.hpp"
 
 #include "class/hid/hid.h"
 #include "class/hid/hid_device.h"

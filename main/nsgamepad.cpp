@@ -6,7 +6,7 @@
 #include "esp_console.h"
 #include "esp_log.h"
 #include "freertos/idf_additions.h"
-#include "hid.hpp"
+#include "nshid.hpp"
 
 namespace NSGamepad {
 
