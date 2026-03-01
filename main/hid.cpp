@@ -1,5 +1,5 @@
 /**
- * @file nshid.cpp
+ * @file hid.cpp
  * @brief Gamepad USB HID component
  *
  * The component initializes Nintendo Switch-compatible gamepad HID descriptors and provides
@@ -7,7 +7,7 @@
  *
  * (с) 2025-2026, Mark Vodyanitskiy (mvodya@icloud.com)
  */
-#include "nshid.hpp"
+#include "hid.hpp"
 
 #include "class/hid/hid.h"
 #include "class/hid/hid_device.h"

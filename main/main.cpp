@@ -3,7 +3,7 @@
 #include "esp_console.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "nshid.hpp"
+#include "hid.hpp"
 #include "nsgamepad.hpp"
 #include "nvs_flash.h"
 #include "web.hpp"

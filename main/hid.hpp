@@ -1,5 +1,5 @@
 /**
- * @file nshid.hpp
+ * @file hid.hpp
  * @brief Gamepad USB HID component
  *
  * The component initializes Nintendo Switch-compatible gamepad HID descriptors and provides
