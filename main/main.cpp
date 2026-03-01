@@ -25,7 +25,7 @@ void app(void) {
 
   // Init USB
   ESP_ERROR_CHECK(HID::init());
-  ESP_ERROR_CHECK(HID::init_hid_task());
+  ESP_ERROR_CHECK(HID::startTask());
 
   // Init WEB (& WiFi)
   ESP_ERROR_CHECK(WEB::init());
@@ -39,7 +39,7 @@ void app(void) {
 
   // Register console commands
   esp_console_register_help_command();
-  ESP_ERROR_CHECK(HID::cmds_register());
+  ESP_ERROR_CHECK(HID::cmdsRegister());
   ESP_ERROR_CHECK(NSGamepad::cmds_register());
   ESP_ERROR_CHECK(WEB::cmds_register());
 

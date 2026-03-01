@@ -11,7 +11,7 @@ menu "Remote NS Gamepad Config"
       
       config NSG_HID_STRDESC_PRODUCT
         string "Product"
-        default "WEB USB NS Gamepad"
+        default "Remote NS Gamepad"
         help
           USB string descriptor specifying the product name.
           Shown in the operating system when the device is connected.
@@ -25,7 +25,7 @@ menu "Remote NS Gamepad Config"
       
       config NSG_HID_STRDESC_HID
         string "HID"
-        default "WEB USB NS Gamepad"
+        default "Remote NS Gamepad"
         help
           USB string descriptor used specifically for the HID interface.
           Typically matches the product name, but can be customized to reflect a specific HID profile.

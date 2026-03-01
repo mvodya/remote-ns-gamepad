@@ -12,7 +12,7 @@ namespace NSGamepad {
 
 static const char* TAG = "app gamepad";
 
-HID::hid_device_report_t hid_report = {
+HID::Report hid_report = {
     .buttons = 0x0,
     .dPad = 0xF,
     // Set axis to zero
@@ -35,7 +35,7 @@ const int dpad_names_num = 9;
 
 // Update gamepad state (send report to console)
 void update() {
-  HID::set_hid_report(hid_report);
+  HID::setReport(hid_report);
 }
 
 // Press button
