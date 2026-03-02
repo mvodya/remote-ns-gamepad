@@ -177,6 +177,8 @@ extern "C" void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id,
  * States
  */
 
+static TaskHandle_t hidTask = nullptr;
+
 // Gamepad report state
 static Report reportState;
 
@@ -184,37 +186,26 @@ static Report reportState;
 static bool reportUpdated = false;
 
 // Is gamepad connected
-static bool isGamepadConnectedState = false;
+static bool gamepadConnected = false;
 
-SemaphoreHandle_t hid_report_state_mtx;
-SemaphoreHandle_t is_gamepad_connected_state_mtx;
-SemaphoreHandle_t report_semaphore;
+// Critical section for reportState/reportUpdated protect
+static portMUX_TYPE reportMux = portMUX_INITIALIZER_UNLOCKED;
+
+// Task to notify after report send
+static TaskHandle_t waitingTask = nullptr;
 
 /*
  * Helpers
  */
 
-// Check is gamepad connected
-bool isGamepadConnected() {
-  bool state = false;
-  if (xSemaphoreTake(is_gamepad_connected_state_mtx, portMAX_DELAY)) {
-    state = isGamepadConnectedState;
-    xSemaphoreGive(is_gamepad_connected_state_mtx);
-  }
-  return state;
-}
-
 // Set gamepad state
-inline void set_is_gamepad_connected(bool state) {
-  if (xSemaphoreTake(is_gamepad_connected_state_mtx, portMAX_DELAY)) {
-    isGamepadConnectedState = state;
-    xSemaphoreGive(is_gamepad_connected_state_mtx);
-  }
+inline void setGamepadConnected(bool state) {
+  gamepadConnected = state;
 }
 
-// Unlocks, when HID report is sended
-inline void wait_hid_report() {
-  xSemaphoreTake(report_semaphore, pdMS_TO_TICKS(1000));
+// Send HID report
+static inline void sendReport(const Report& r) {
+  tud_hid_report(0, &r, sizeof(r));
 }
 
 /*
@@ -222,56 +213,88 @@ inline void wait_hid_report() {
  */
 
 // Task for USB HID report
-void hidTask(void*) {
+void hidTaskFn(void*) {
   const TickType_t freq = pdMS_TO_TICKS(CONFIG_NSG_HID_POOLING_TICKRATE_MS);
-  TickType_t last_wake_time = xTaskGetTickCount();
+
+  TickType_t lastWakeTime = xTaskGetTickCount();
+
   ESP_LOGI(TAG, "HID handler task runned, pooling tickrate: %d",
            CONFIG_NSG_HID_POOLING_TICKRATE_MS);
 
-  while (1) {
-    if (tud_mounted()) {
-      if (!isGamepadConnected() && !tud_suspended()) {
-        // For connection we need to trigger some buttons after USB initialization
-        if (xSemaphoreTake(hid_report_state_mtx, portMAX_DELAY)) {
-          // Clear report
-          memset(&reportState, 0x00, sizeof(reportState));
+  while (true) {
+    // Wait timeout or kick
+    (void)ulTaskNotifyTake(pdTRUE, freq);
 
-          // Set axis to zero
-          reportState.leftXAxis = 0x80;
-          reportState.leftYAxis = 0x80;
-          reportState.rightXAxis = 0x80;
-          reportState.rightYAxis = 0x80;
-
-          // Push one button for init
-#if CONFIG_NSG_HID_AUTO_INIT_AFTER_MOUNT
-          tud_hid_report(0, &reportState, sizeof(reportState));
-          vTaskDelay(pdMS_TO_TICKS(1000));
-          reportState.buttons = (uint16_t)1;
-          tud_hid_report(0, &reportState, sizeof(reportState));
-          vTaskDelay(pdMS_TO_TICKS(100));
-          reportState.buttons = (uint16_t)0;
-          tud_hid_report(0, &reportState, sizeof(reportState));
-          vTaskDelay(pdMS_TO_TICKS(100));
-          xSemaphoreGive(hid_report_state_mtx);
-#endif
-        }
-
-        ESP_LOGI(TAG, "Gamepad connected");
-        set_is_gamepad_connected(true);
-
-      } else if (isGamepadConnectedState && tud_suspended()) {
-        ESP_LOGI(TAG, "Gamepad unconnected");
-        set_is_gamepad_connected(false);
-      }
-
-      // Report gamepad state
-      if (xSemaphoreTake(hid_report_state_mtx, portMAX_DELAY)) {
-        tud_hid_report(0, &reportState, sizeof(reportState));
-        xSemaphoreGive(hid_report_state_mtx);
-      }
-      xSemaphoreGive(report_semaphore);
+    if (!tud_mounted()) {
+      if (gamepadConnected)
+        ESP_LOGI(TAG, "Gamepad unconnected, reason: unmounted");
+      setGamepadConnected(false);
+      continue;
     }
-    vTaskDelayUntil(&last_wake_time, freq);
+
+    if (tud_suspended()) {
+      if (gamepadConnected)
+        ESP_LOGI(TAG, "Gamepad unconnected, reason: suspended");
+      setGamepadConnected(false);
+      continue;
+    }
+
+    if (!gamepadConnected) {
+      // For connection we need to trigger some buttons after USB initialization
+      // Set axis to zero
+      Report initReport = {0, 0, 0x80, 0x80, 0x80, 0x80, 0};
+
+      ESP_LOGI(TAG, "Set gamepad init sequence");
+      setReport(initReport);
+
+      // For connection we need to trigger some buttons after USB initialization
+      // Push one button for init
+#if CONFIG_NSG_HID_AUTO_INIT_AFTER_MOUNT
+      ESP_LOGI(TAG, "Run gamepad connection sequence");
+      sendReport(initReport);
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      initReport.buttons = (uint16_t)1;
+      sendReport(initReport);
+      vTaskDelay(pdMS_TO_TICKS(100));
+      initReport.buttons = (uint16_t)0;
+      sendReport(initReport);
+      vTaskDelay(pdMS_TO_TICKS(100));
+#endif
+
+      ESP_LOGI(TAG, "Gamepad connected");
+      setGamepadConnected(true);
+    }
+
+    if (!tud_hid_ready()) {
+      // endpoint is busy, wait next tick
+      continue;
+    }
+
+    taskENTER_CRITICAL(&reportMux);
+    Report report = reportState;
+    bool updated = reportUpdated;
+    if (updated) {
+      reportUpdated = false;
+    }
+    TaskHandle_t toNotify = waitingTask;
+    taskEXIT_CRITICAL(&reportMux);
+
+    // Report gamepad state
+    if (updated) {
+      // Send updated report
+      sendReport(report);
+    } else {
+      // TODO: make config
+      // Send (repeat) last report without update
+      sendReport(report);
+    }
+
+    // Send waiting task notification
+    if (toNotify) {
+      xTaskNotifyGive(toNotify);
+    }
+
+    vTaskDelayUntil(&lastWakeTime, freq);
   }
 }
 
@@ -282,13 +305,6 @@ void hidTask(void*) {
 // Setup USB descriptors & initialize USB stack
 esp_err_t init() {
   ESP_LOGI(TAG, "USB initialization");
-
-  // Create semaphore for HID task
-  report_semaphore = xSemaphoreCreateBinary();
-  // Create mutex for HID report
-  hid_report_state_mtx = xSemaphoreCreateMutex();
-  // Create mutex for gamepad state
-  is_gamepad_connected_state_mtx = xSemaphoreCreateMutex();
 
   // TinyUSB config
   const tinyusb_config_t tusb_cfg = {
@@ -306,23 +322,55 @@ esp_err_t init() {
 
 // Run task for HID handler
 esp_err_t startTask() {
+  if (hidTask) {
+    return ESP_ERR_INVALID_STATE;
+  }
+
   ESP_LOGI(TAG, "Create HID handler task");
-  xTaskCreate(hidTask, "app_hid_task", 2500, NULL, 6, NULL);
+  auto ok = xTaskCreate(hidTaskFn, "app_hid_task", 2500, NULL, 6, &hidTask);
+  if (ok != pdPASS || !hidTask) {
+    return ESP_ERR_NO_MEM;
+  }
 
   return ESP_OK;
 }
 
 // Set HID device report
-esp_err_t setReport(const Report& report) {
-  if (isGamepadConnected()) {
-    if (xSemaphoreTake(hid_report_state_mtx, portMAX_DELAY)) {
-      reportState = report;
-      xSemaphoreGive(hid_report_state_mtx);
-    }
-    wait_hid_report();
-    return ESP_OK;
+esp_err_t setReport(const Report& report, bool waitUntilSend) {
+  TaskHandle_t caller = nullptr;
+
+  if (waitUntilSend) {
+    caller = xTaskGetCurrentTaskHandle();
   }
-  return ESP_ERR_INVALID_STATE;
+
+  taskENTER_CRITICAL(&reportMux);
+  reportState = report;
+  reportUpdated = true;
+  waitingTask = caller;
+  taskEXIT_CRITICAL(&reportMux);
+
+  xTaskNotifyGive(hidTask);
+
+  if (waitUntilSend) {
+    if (ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000)) == 0) {
+      ESP_LOGW(TAG, "Set report timeout (wait until send)");
+      return ESP_ERR_TIMEOUT;
+    }
+  }
+
+  return ESP_OK;
+}
+
+// Force send HID report
+void kick() {
+  if (hidTask) {
+    xTaskNotifyGive(hidTask);
+  }
+}
+
+// Check is gamepad connected
+bool isGamepadConnected() {
+  return gamepadConnected;
 }
 
 /*

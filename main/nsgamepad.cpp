@@ -35,7 +35,7 @@ const int dpad_names_num = 9;
 
 // Update gamepad state (send report to console)
 void update() {
-  HID::setReport(hid_report);
+  HID::setReport(hid_report, true);
 }
 
 // Press button

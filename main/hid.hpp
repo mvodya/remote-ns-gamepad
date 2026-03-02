@@ -37,11 +37,12 @@ esp_err_t init();
 esp_err_t startTask();
 
 // Set HID device report
-// Thread-safe. Blocks until report is sended
-esp_err_t setReport(const Report& report);
+esp_err_t setReport(const Report& report, bool waitUntilSend = false);
+
+// Force send HID report
+void kick();
 
 // Get gamepad state
-// Thread-safe
 bool isGamepadConnected();
 
 // Register console commands
