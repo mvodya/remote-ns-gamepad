@@ -239,6 +239,11 @@ void hidTaskFn(void*) {
       continue;
     }
 
+    if (!tud_hid_ready()) {
+      // Endpoint is busy, wait next tick
+      continue;
+    }
+
     if (!gamepadConnected) {
       // For connection we need to trigger some buttons after USB initialization
       // Set axis to zero
@@ -263,11 +268,6 @@ void hidTaskFn(void*) {
 
       ESP_LOGI(TAG, "Gamepad connected");
       setGamepadConnected(true);
-    }
-
-    if (!tud_hid_ready()) {
-      // endpoint is busy, wait next tick
-      continue;
     }
 
     taskENTER_CRITICAL(&reportMux);
