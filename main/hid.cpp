@@ -17,8 +17,8 @@
 #include "esp_log.h"
 #include "freertos/idf_additions.h"
 #include "portmacro.h"
-#include "projdefs.h"
 #include "tinyusb.h"
+#include <cstddef>
 
 namespace HID {
 
@@ -313,6 +313,8 @@ esp_err_t init() {
       .string_descriptor_count = sizeof(stringDescriptor) / sizeof(stringDescriptor[0]),
       .external_phy = false,
       .configuration_descriptor = configurationDescriptor,
+      .self_powered = true,
+      .vbus_monitor_io = -1,
   };
   ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
   ESP_LOGI(TAG, "USB initialization DONE");
@@ -398,6 +400,9 @@ esp_err_t cmdsRegister() {
       .help = "Get USB status information",
       .hint = NULL,
       .func = &cmd_usbinfo,
+      .argtable = NULL,
+      .func_w_context = NULL,
+      .context = NULL,
   };
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_usbinfo_cfg));
 

@@ -14,7 +14,6 @@
 #include "esp_wifi_types_generic.h"
 #include "freertos/idf_additions.h"
 #include "nsgamepad.hpp"
-#include "projdefs.h"
 
 // Convert option NSG_WIFI_SCAN_AUTH_MODE_THRESHOLD -> wifi_auth_mode_t
 #if CONFIG_NSG_WIFI_AUTH_OPEN

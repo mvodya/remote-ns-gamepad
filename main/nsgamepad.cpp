@@ -1,5 +1,6 @@
 #include "nsgamepad.hpp"
 
+#include <cstddef>
 #include <cstring>
 
 #include "argtable3/argtable3.h"
@@ -20,6 +21,7 @@ HID::Report hid_report = {
     .leftYAxis = 0x80,
     .rightXAxis = 0x80,
     .rightYAxis = 0x80,
+    .filler = 0x0,
 };
 
 // Buttons string list
@@ -375,7 +377,9 @@ esp_err_t cmds_register() {
                                            .help = "Press gamepad button",
                                            .hint = NULL,
                                            .func = &cmd_press,
-                                           .argtable = &cmd_press_release_args};
+                                           .argtable = &cmd_press_release_args,
+                                           .func_w_context = NULL,
+                                           .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_press_cfg));
 
   // Register release command
@@ -383,7 +387,9 @@ esp_err_t cmds_register() {
                                              .help = "Release gamepad button",
                                              .hint = NULL,
                                              .func = &cmd_release,
-                                             .argtable = &cmd_press_release_args};
+                                             .argtable = &cmd_press_release_args,
+                                             .func_w_context = NULL,
+                                             .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_release_cfg));
 
   // Register click command
@@ -391,7 +397,9 @@ esp_err_t cmds_register() {
                                            .help = "Press & release gamepad button",
                                            .hint = NULL,
                                            .func = &cmd_click,
-                                           .argtable = &cmd_click_args};
+                                           .argtable = &cmd_click_args,
+                                           .func_w_context = NULL,
+                                           .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_click_cfg));
 
   // Register setdpad command
@@ -399,7 +407,9 @@ esp_err_t cmds_register() {
                                              .help = "Set dpad direction",
                                              .hint = NULL,
                                              .func = &cmd_setdpad,
-                                             .argtable = &cmd_setdpad_args};
+                                             .argtable = &cmd_setdpad_args,
+                                             .func_w_context = NULL,
+                                             .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_setdpad_cfg));
 
   // Register dpad command
@@ -407,7 +417,9 @@ esp_err_t cmds_register() {
                                           .help = "Set & unset dpad direction",
                                           .hint = NULL,
                                           .func = &cmd_dpad,
-                                          .argtable = &cmd_dpad_args};
+                                          .argtable = &cmd_dpad_args,
+                                          .func_w_context = NULL,
+                                          .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_dpad_cfg));
 
   // Register axis command
@@ -415,7 +427,9 @@ esp_err_t cmds_register() {
                                           .help = "Set value for axis stick",
                                           .hint = NULL,
                                           .func = &cmd_axis,
-                                          .argtable = &cmd_axis_args};
+                                          .argtable = &cmd_axis_args,
+                                          .func_w_context = NULL,
+                                          .context = NULL};
   ESP_ERROR_CHECK(esp_console_cmd_register(&cmd_axis_cfg));
 
   return ESP_OK;
